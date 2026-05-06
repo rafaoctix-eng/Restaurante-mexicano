@@ -1,14 +1,23 @@
 'use client';
 
 import Link from 'next/link';
+import Script from 'next/script';
+import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
+
+declare global {
+  interface Window {
+    WidgetCheckout: any;
+  }
+}
 
 function formatCOP(value: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 }
 
 export default function CartPage() {
-  const { items, updateQuantity, removeFromCart, totalPrice } = useCart();
+  const { items, updateQuantity, removeFromCart, totalPrice, clearCart } = useCart();
+  const router = useRouter();
 
   const subtotal = totalPrice;
   const iva = subtotal * 0.19;
@@ -29,7 +38,38 @@ export default function CartPage() {
   }
 
   const handlePay = async (method: string) => {
-    alert(`Pago con ${method}: En producción, esto te redirige a Wompi para completar el pago con ${method}.\n\nTotal: ${formatCOP(total)}\n\nPara activarlo, configura tu clave pública de Wompi en las variables de entorno.`);
+    const publicKey = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY;
+    
+    if (!publicKey) {
+      alert('Error: No se ha configurado la clave pública de Wompi (NEXT_PUBLIC_WOMPI_PUBLIC_KEY).');
+      return;
+    }
+
+    if (typeof window === 'undefined' || !window.WidgetCheckout) {
+      alert('El widget de pagos está cargando, por favor intenta en unos segundos...');
+      return;
+    }
+
+    // Generar una referencia única para la transacción
+    const reference = `ORDER_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+    const checkout = new window.WidgetCheckout({
+      currency: 'COP',
+      amountInCents: Math.round(total * 100), // Wompi requiere centavos
+      reference: reference,
+      publicKey: publicKey,
+      // redirectUrl: Opcional, si no se pone, usa el modal in-page
+    });
+
+    checkout.open((result: any) => {
+      const transaction = result.transaction;
+      if (transaction.status === 'APPROVED') {
+        clearCart();
+        router.push('/checkout/success');
+      } else {
+        alert(`El pago no fue aprobado. Estado: ${transaction.status}`);
+      }
+    });
   };
 
   return (
@@ -76,6 +116,7 @@ export default function CartPage() {
           </button>
         </div>
       </div>
+      <Script src="https://checkout.wompi.co/widget.js" strategy="lazyOnload" />
     </div>
   );
 }
