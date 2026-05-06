@@ -38,7 +38,8 @@ export default function CartPage() {
   }
 
   const handlePay = async (method: string) => {
-    const publicKey = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY;
+    // Usamos la llave de entorno, pero si no existe, usamos la llave pública de pruebas oficial de Wompi por defecto
+    const publicKey = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY || 'pub_test_Q5yDA9xoKdePzhS8s5DTrLgHhM7nL2aI';
     
     if (!publicKey) {
       alert('Error: No se ha configurado la clave pública de Wompi (NEXT_PUBLIC_WOMPI_PUBLIC_KEY).');
